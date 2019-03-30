@@ -33,17 +33,50 @@ class Circle(CrossSection):
         z = 0.0
         return Vector((x, y, z))
 
+class Lissajous(CrossSection):
+    """
+    Lissajous curves: like the parametric equation for a circle but
+    where the frequences are not the same in each direction:
+
+    x = cos(a * theta)
+    y = cos(b * theta)
+    """
+    def __init__(self, a, b):
+        """
+        a is the frequency in the x direction,
+        b is the frequency in the y direction
+        """
+        self.a = a
+        self.b = b
+
+    def position(self, u, v):
+        theta = 2.0 * math.pi * u
+        x = math.cos(self.a * theta)
+        y = math.sin(self.b * theta)
+        z = 0.0
+        return Vector((x, y, z))
+
 class Transformed(CrossSection):
     """
     Decorator that applies a transformation to a cross section
     """
     def __init__(self, original_cs, xform):
+        """
+        original_cs: the CrossSection to transform
+
+        xform: either an XForm object or a function
+            f(position, u, v) = an XForm object
+        """
         self.original_cs = original_cs
         self.xform = xform
 
     def position(self, u, v):
         pos = self.original_cs.position(u, v)
-        return self.xform.transform(pos)
+
+        # If we have a callable, call it to get an xform. If we have a
+        # constant xform, just use it.
+        xform = self.xform(pos, u, v) if callable(self.xform) else self.xform
+        return xform.transform(pos)
 
 class Union(CrossSection):
     def __init__(self, cross_sections):
