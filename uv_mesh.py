@@ -2,11 +2,6 @@ import bpy
 import bmesh
 from mathutils import Vector
 
-import util
-import cross_section
-import path
-from extruded_surface import ExtrudedSurface
-
 def make_uvs(u_quads, v_quads):
     """
     Create a UV mesh with u_quads quads in the u direction
@@ -45,10 +40,3 @@ def make_uv_mesh(u_quads, v_quads, surface):
             ]
             bm.faces.new(face_verts)
     return bm
-
-cs = cross_section.Circle()
-path = path.Line(Vector((-2, 0, 0)), Vector((2, 0, 0)))
-surf = ExtrudedSurface(cs, path)
-
-bm = make_uv_mesh(24, 10, surf)
-util.link_mesh('Surface', bm)
