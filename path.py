@@ -167,6 +167,3 @@ class Helix(Path):
         N = Vector((ddx, ddy, ddz))
         N.normalize()
         return N
-
-
-
