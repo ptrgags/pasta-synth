@@ -167,3 +167,53 @@ class Helix(Path):
         N = Vector((ddx, ddy, ddz))
         N.normalize()
         return N
+
+class Transformed(Path):
+    """
+    Transform the path with an XForm
+    """
+    def __init__(self, path, xform):
+        """
+        path is the path to wrap
+        xform is either a callable f(pos, v): XForm or an XForm
+        """
+        self.path = path
+        self.xform = xform
+
+    def get_xform(self, pos, v):
+        """
+        If xform is a callable, call it to get a Xform. Otherwise, assumme
+        it is an XForm
+        """
+        if callable(self.xform):
+            return self.xform(pos, v)
+        else:
+            return self.xform
+    
+    def position(self, v):
+        pos = self.path.position(v)
+
+        xform = self.get_xform(pos, v)
+        return xform.transform(pos)
+
+    def tangent(self, v):
+        pos = self.path.position(v)
+        T = self.path.tangent(v)
+
+        xform = self.get_xform(pos, v)
+        transformed = xform.jacobian(pos) * T
+        transformed.normalize()
+        return transformed
+
+    def normal(self, v):
+        pos = self.path.position(v)
+        N = self.path.normal(v)
+
+        xform = self.get_xform(pos, v)
+        jac_inv_T = xform.jacobian(pos)
+        jac_inv_T.invert()
+        jac_inv_T.transpose()
+
+        transformed = jac_inv_T * N
+        transformed.normalize()
+        return transformed
