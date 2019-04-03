@@ -1,3 +1,5 @@
+import math
+
 from mathutils import Vector
 from mathutils import Matrix
 
@@ -53,6 +55,27 @@ class Translate(XForm):
             (0, 1, 0),
             (0, 0, 1)))
 
+class RotateZ(XForm):
+    def __init__(self, angle):
+        self.angle = angle
+
+    def transform(self, point):
+        c = math.cos(self.angle)
+        s = math.sin(self.angle)
+
+        x = point.x * c - point.y * s
+        y = point.x * s + point.y * c
+        z = point.z
+        return Vector((x, y, z))
+
+    def jacobian(self, point):
+        c = math.cos(self.angle)
+        s = math.sin(self.angle)
+        return Matrix((
+            (c, -s, 0.0),
+            (s, c, 0.0),
+            (0, 0, 1)))
+
 class SuperScale(XForm):
     """
     Transformation that turns a unit circle into a unit superellipse with
@@ -91,6 +114,8 @@ class SuperScale(XForm):
             (0, yy, 0),
             (0, 0, zz)))
 
+
+
     @classmethod
     def sgn(cls, x):
         """
@@ -127,9 +152,7 @@ class SuperScale(XForm):
         # If x is exactly at 0.0, return nan and let the caller decide
         # This handles the first term, since it is 0 except when x == 0
         if x == 0.0:
-            print("Warning: superfunc_deriv() evaluated at 0")
             return 1.0
-            #return float('nan')
 
         # Compute the second term.
         return (2.0 / n) * abs(x) ** (2.0 / n - 1.0)

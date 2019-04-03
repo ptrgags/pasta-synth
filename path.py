@@ -1,6 +1,8 @@
 import math
+import util
 
 from mathutils import Vector
+from mathutils import Matrix
 
 class Path:
     """
@@ -103,12 +105,10 @@ class Helix(Path):
         z(v) = lerp(heights, v)
         """
         # The height is a linear interpolation of the two heights
-        z0, zf = self.heights
-        z = (1.0 - v) * z0 + v * zf
+        z = util.lerp(self.heights, v)
 
         # For x and y, the angle gets lerp-ed
-        phi0, phif = self.angles
-        phi = (1.0 - v) * phi0 + v * phif
+        phi = util.lerp(self.angles, v)
         x = math.cos(phi)
         y = math.sin(phi)
         return Vector((x, y, z))
@@ -125,6 +125,7 @@ class Helix(Path):
         Then normalize the vector (x', y', z') to get the unit direction.
         """
         # the slope in the z direction is simply the change in height
+        # TODO: Refactor to use lerp()
         z0, zf =  self.heights
         dz = zf - z0
 
@@ -209,9 +210,17 @@ class Transformed(Path):
         pos = self.path.position(v)
         N = self.path.normal(v)
 
+        # Try to transform the normals with the inverse transpose of the
+        # jacobian. However, if this fails at a point due to non-continuous
+        # derivatives, fallback to the identity transformation
+        I = Matrix((
+            (1, 0, 0),
+            (0, 1, 0),
+            (0, 0, 1)))
+
         xform = self.get_xform(pos, v)
         jac_inv_T = xform.jacobian(pos)
-        jac_inv_T.invert()
+        jac_inv_T.invert(I)
         jac_inv_T.transpose()
 
         transformed = jac_inv_T * N
