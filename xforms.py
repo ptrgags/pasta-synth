@@ -20,6 +20,14 @@ class XForm:
         """
         raise NotImplementedError
 
+    @property
+    def inverse(self):
+        """
+        If this transformation has an inverse, override this method
+        and return an instance of the inverse XForm.
+        """
+        return None
+
 class Scale(XForm):
     def __init__(self, sx, sy, sz):
         self.sx = sx
@@ -38,6 +46,10 @@ class Scale(XForm):
             (0.0, self.sy, 0.0),
             (0.0, 0.0, self.sz)))
 
+    @property
+    def inverse(self):
+        return Scale(1.0 / self.sx, 1.0 / self.sy, 1.0 / self.sz)
+
 class Translate(XForm):
     def __init__(self, offset):
         self.offset = offset
@@ -54,6 +66,10 @@ class Translate(XForm):
             (1, 0, 0),
             (0, 1, 0),
             (0, 0, 1)))
+
+    @property
+    def inverse(self):
+        return Translate(-self.offset)
 
 class RotateZ(XForm):
     def __init__(self, angle):
@@ -75,6 +91,10 @@ class RotateZ(XForm):
             (c, -s, 0.0),
             (s, c, 0.0),
             (0, 0, 1)))
+
+    @property
+    def inverse(self):
+        return RotateZ(-self.angle)
 
 class SuperScale(XForm):
     """
@@ -113,8 +133,6 @@ class SuperScale(XForm):
             (xx, 0, 0),
             (0, yy, 0),
             (0, 0, zz)))
-
-
 
     @classmethod
     def sgn(cls, x):
@@ -156,3 +174,135 @@ class SuperScale(XForm):
 
         # Compute the second term.
         return (2.0 / n) * abs(x) ** (2.0 / n - 1.0)
+
+class CartesianToCylindrical(XForm):
+    """
+    Convert (x, y, z) to (s, phi, z)
+    """
+    def transform(self, point):
+        x = point.x
+        y = point.y
+
+        s = math.hypot(y, x)
+        phi = math.atan2(y, x)
+        z = point.z
+
+        return Vector((s, phi, z))
+
+    def jacobian(self, point):
+        x = point.x
+        y = point.y
+
+        s = math.hypot(y, x)
+        s_sqr = x * x + y * y
+
+        return Matrix((
+            (x / s, y / s, 0),
+            (-y / s_sqr, x / s_sqr, 0),
+            (0, 0, 1)))
+
+    @property
+    def inverse(self):
+        return CylindricalToCartesian()
+
+class CylindricalToCartesian(XForm):
+    """
+    Convert (s, phi, z) to (x, y, z)
+    """
+    def transform(self, point):
+        s = point.x
+        phi = point.y
+        z = point.z
+
+        x = s * math.cos(phi)
+        y = s * math.sin(phi)
+
+        return Vector((x, y, z))
+
+    def jacobian(self, point):
+        s = point.x
+        phi = point.y
+
+        cp = math.cos(phi)
+        sp = math.sin(phi)
+
+        return Matrix((
+            (cp, -s * sp, 0),
+            (sp, s * cp, 0),
+            (0, 0, 1)))
+
+    @property
+    def inverse(self):
+        return CartesianToCylindrical()
+
+class Sinusoidal(XForm):
+    """
+    Apply sin(x) to each component.
+
+    Apply a Scale/Translation before Sinusoidal to control frequency
+    and phase
+
+    Apply a Scale/Translation after Sinusoidal to control amplitude
+    """
+    def transform(self, point):
+        x = math.sin(point.x)
+        y = math.sin(point.y)
+        z = math.sin(point.z)
+        return Vector((x, y, z))
+
+    def jacobian(self, point):
+        xx = math.cos(point.x)
+        yy = math.cos(point.y)
+        zz = math.cos(point.z)
+        return Matrix((
+            (xx, 0, 0),
+            (0, yy, 0),
+            (0, 0, zz)))
+
+class Conjugated(XForm):
+    """
+    Conjugate XForm A by an invertible 
+    XForm B by applying:
+
+    C = B * A * B^(-1)
+
+    This is useful for changing coordinate systems. For example, to apply
+    a radial scaling, conjugate by a transformation to Cylindrical coordinates
+    (well, in this case a 
+    Conjugated(Scale(scale_factor, 1, 1), CylindricalToCartesian())
+    """
+    def __init__(self, original, conjugate_by):
+        self.A = original
+        self.B = conjugate_by
+        self.B_inv = conjugate_by.inverse
+
+        if self.B_inv is None:
+            raise ValueError("conjugate_by must have an inverse")
+
+    def transform(self, point):
+        change_coords = self.B_inv.transform(point)
+        xformed = self.A.transform(change_coords)
+        restore_coords = self.B.transform(xformed)  
+        return restore_coords
+         
+    def jacobian(self, point):
+        """
+        Since a conjugation is just a composition of 3 transformations,
+        multipy the jacobians to get the overall 
+        """
+        jac_B = self.B.jacobian(point)
+        jac_A = self.A.jacobian(point)
+        jac_B_inv = self.B_inv.jacobian(point)
+
+        return jac_B * jac_A * jac_B_inv
+
+    @classmethod
+    def cylindrical_xform(cls, xform):
+        """
+        This is a common transformation to get radial scaling. 
+        So here is a shortcut.
+        """
+        # Note that we pass in the cylindrical -> cartesian as the
+        # A transform since the composition is done
+        # right to left: ABA^(-1)
+        return cls(xform, CylindricalToCartesian)

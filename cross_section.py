@@ -1,4 +1,7 @@
 import math
+import operator
+import functools
+
 from mathutils import Vector
 
 class CrossSection:
@@ -21,6 +24,16 @@ class CrossSection:
         doesn't have to be ;)
         """
         raise NotImplementedError
+
+class Line(CrossSection):
+    """
+    Line segment pointing along the x-axis starting at the origin
+    """
+    def position(self, u, v):
+        x = u
+        y = 0.0
+        z = 0.0
+        return Vector((x, y, z))
 
 class Circle(CrossSection):
     """
@@ -53,6 +66,18 @@ class Lissajous(CrossSection):
         theta = 2.0 * math.pi * u
         x = math.cos(self.a * theta)
         y = math.sin(self.b * theta)
+        z = 0.0
+        return Vector((x, y, z))
+
+class RoseCurve(CrossSection):
+    def __init__(self, k):
+        self.k = k
+
+    def position(self, u, v):
+        theta = 2.0 * math.pi * u
+        radius = math.cos(self.k * theta)
+        x = radius * math.cos(theta)
+        y = radius * math.sin(theta)
         z = 0.0
         return Vector((x, y, z))
 
@@ -93,3 +118,15 @@ class Union(CrossSection):
         except IndexError:
             cs = self.cross_sections[-1]
             return cs.position(1.0, v)
+
+class Combine(CrossSection):
+    """
+    Combine multiple cross sections with a math function.
+    """
+    def __init__(self, operation=operator.add, *cross_sections):
+        self.op = operation
+        self.cross_sections = cross_sections
+    
+    def position(self, u, v):
+        points = [cs.position(u, v) for cs in self.cross_sections]
+        return functools.reduce(self.op, points)
