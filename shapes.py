@@ -150,3 +150,48 @@ class SuperSeashell(ExtrudedShape):
         pth = path.Transformed(pth, make_superellipse)
         pth = path.Transformed(pth, spiral)
         return pth
+
+class LissajousPasta(ExtrudedShape):
+    @property
+    def default_params(self): 
+        return {
+            'path_bend_yaw': (0.0, 0.0),
+            'path_bend_pitch': (0.0, 0.0),
+            'path_z': (-1.0, 1.0),
+            'cross_section_a': (1.0, 1.0),
+            'cross_section_b': (2.0, 2.0),
+            'cross_section_twist': (0.0, 0.0),
+            'cross_section_offset': 
+                (Vector((0.0, 0.0, 0.0)), Vector((0.0, 0.0, 0.0))),
+            'cross_section_scale_x': (1.0, 1.0),
+            'cross_section_scale_y': (1.0, 1.0),
+        }
+
+    def make_cross_section(self):
+        # TODO: Pass lerp into lissajous function
+        a = self.params['cross_section_a'][0]
+        b = self.params['cross_section_b'][0]
+
+        def taper(pos, u, v):
+            x = self.lerp_param('cross_section_scale_x', v)
+            y = self.lerp_param('cross_section_scale_y', v)
+            return xforms.Scale(x, y, 1)
+
+        def twist(pos, u, v):
+            twist_angle = self.lerp_param('cross_section_twist', v)
+            return xforms.RotateZ(twist_angle) 
+
+        def shear(pos, u, v):
+            offset = self.lerp_param('cross_section_offset', v)
+            return xforms.Translate(offset)
+
+        cs = cross_section.Lissajous(a, b)
+        cs = cross_section.Transformed(cs, taper)
+        cs = cross_section.Transformed(cs, twist)
+        cs = cross_section.Transformed(cs, shear)
+        return cs
+
+    def make_path(self):
+        z0, zf = self.params['path_z']
+        pth = path.Line(Vector((0, z0, 0)), Vector((0, zf, 0)))
+        return pth

@@ -64,6 +64,7 @@ class Lissajous(CrossSection):
 
     def position(self, u, v):
         theta = 2.0 * math.pi * u
+
         x = math.cos(self.a * theta)
         y = math.sin(self.b * theta)
         z = 0.0
